@@ -1,0 +1,23 @@
+[package]
+
+name = "conduit-compress"
+version = "0.0.0"
+authors = ["Jonathan Reem <jonathan.reem@gmail.com>"]
+
+[[lib]]
+
+name = "conduit-compress"
+path = "src/lib.rs"
+
+[dependencies.conduit]
+
+git = "https://github.com/conduit-rust/conduit.git"
+
+[dependencies.conduit-middleware]
+
+git = "https://github.com/conduit-rust/conduit-middleware.git"
+
+[dev-dependencies.conduit-test]
+
+git = "https://github.com/conduit-rust/conduit-test.git"
+

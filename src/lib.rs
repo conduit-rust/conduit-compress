@@ -1,27 +1,81 @@
 #![crate_name = "conduit-compress"]
-#![feature(globs)]
+#![feature(globs, phase)]
 
 extern crate conduit;
 extern crate middleware = "conduit-middleware";
+#[phase(plugin, link)] extern crate log;
 
 use middleware::Middleware;
 use conduit::{Request, Response};
+use std::collections::HashMap;
+use std::fmt::Show;
 
 #[deriving(Show, Clone)]
-struct Compress;
+pub struct Compress;
+
 
 impl middleware::Middleware for Compress {
     fn after(&self, req: &mut Request, res: Result<Response, Box<Show>>)
         -> Result<Response, Box<Show>> {
-        match req.headers.find("Accept-Encoding") {
+        match req.headers().find("Accept-Encoding") {
             Some(ref accept_encoding) => {
-                res.map(|r| {
-                    // do some compression
+                res.and_then(|r| {
+                    let priorities = parse_accept_encoding(accept_encoding);
+
+                    // Not implemented
+                    Err(box "String".to_string() as Box<Show>)
                 })
             },
             // no compression enabled for this request
             None => res
         }
+    }
+}
+
+#[deriving(Show, Clone)]
+pub enum CompresErrorKind {
+    NoCompressor
+}
+
+#[deriving(Show, Clone)]
+pub struct CompressError<S> {
+    kind: CompresErrorKind,
+    desc: S
+}
+
+#[deriving(PartialEq, Eq, Show, Clone, Hash)]
+enum Compressor {
+    Gzip,
+    Deflate
+}
+
+type EncodingPriorities = HashMap<Compressor, f64>;
+
+fn parse_accept_encoding<'a>(accept_encodings: &'a Vec<&'a str>) -> Result<EncodingPriorities, Box<Show>> {
+    let mut priorities: EncodingPriorities = HashMap::new();
+    accept_encodings.iter().map(|encoding| {
+        match encoding.chars().position(|s| s == ';') {
+            Some(_) => {
+                let split = encoding.split(';').collect::<Vec<&'a str>>();
+                if split.len() != 2 {
+                    error!("Bad formatting in Accept-Encoding header: {}", encoding);
+                } else {
+                    parse_encoding(*split.get(0)).map(|c| from_str::<f64>(*split.get(1)).map(|p| {
+                        priorities.insert(c, p)
+                    }));
+                }
+            },
+            None => { parse_encoding(*encoding).map(|c| priorities.insert(c, 1.0)); }
+        }
+    });
+    Ok(priorities)
+}
+
+fn parse_encoding(compressor: &str) -> Option<Compressor> {
+    match compressor {
+        "gzip" => Some(Gzip),
+        "deflate" => Some(Deflate),
+        _ => None
     }
 }
 

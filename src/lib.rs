@@ -9,7 +9,6 @@ use std::fmt::Show;
 use middleware::Middleware;
 use conduit::{Request, Response};
 use parse::{get_compressor, };
-use compressors::{Gzip, Deflate};
 
 mod parse;
 mod compressors;
@@ -22,15 +21,10 @@ impl middleware::Middleware for Compress {
         -> Result<Response, Box<Show>> {
         match req.headers().find("Accept-Encoding") {
             Some(ref accept_encoding) => {
-                res.and_then(|r| {
-                    get_compressor(accept_encoding).and_then(|compressor| {
-                        match compressor {
-                            Gzip => (),
-                            Deflate => ()
-                        }
-                        Err(box "String".to_string() as Box<Show>)
-                    })
-                })
+                let mut r = try!(res);
+                let compressor = try!(get_compressor(accept_encoding));
+                compressor.compress(&mut r);
+                Err(box "String".to_string() as Box<Show>)
             },
             // no compression enabled for this request
             None => res

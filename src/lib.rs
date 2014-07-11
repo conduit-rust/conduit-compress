@@ -13,17 +13,19 @@ use std::fmt::Show;
 #[deriving(Show, Clone)]
 pub struct Compress;
 
-
 impl middleware::Middleware for Compress {
     fn after(&self, req: &mut Request, res: Result<Response, Box<Show>>)
         -> Result<Response, Box<Show>> {
         match req.headers().find("Accept-Encoding") {
             Some(ref accept_encoding) => {
                 res.and_then(|r| {
-                    let priorities = parse_accept_encoding(accept_encoding);
-
-                    // Not implemented
-                    Err(box "String".to_string() as Box<Show>)
+                    get_compressor(accept_encoding).and_then(|compressor| {
+                        match compressor {
+                            Gzip => (),
+                            Deflate => ()
+                        }
+                        Err(box "String".to_string() as Box<Show>)
+                    })
                 })
             },
             // no compression enabled for this request
@@ -49,11 +51,28 @@ enum Compressor {
     Deflate
 }
 
+fn get_compressor<'a>(accept_encoding: &'a Vec<&'a str>) -> Result<Compressor, Box<Show>> {
+    parse_accept_encoding(accept_encoding).and_then(best_encoder)
+}
+
 type EncodingPriorities = HashMap<Compressor, f64>;
+
+fn best_encoder(priorities: EncodingPriorities) -> Result<Compressor, Box<Show>> {
+    priorities.move_iter().fold((Err(box CompressError {
+        kind: NoCompressor,
+        desc: "No compressor supported for the requested encodings."
+    } as Box<Show>), 0f64), |(best, bestPriority), (compressor, priority)| {
+        if priority > bestPriority {
+            (Ok(compressor), priority)
+        } else {
+            (best, bestPriority)
+        }
+    }).val0()
+}
 
 fn parse_accept_encoding<'a>(accept_encodings: &'a Vec<&'a str>) -> Result<EncodingPriorities, Box<Show>> {
     let mut priorities: EncodingPriorities = HashMap::new();
-    accept_encodings.iter().map(|encoding| {
+    for encoding in accept_encodings.iter() {
         match encoding.chars().position(|s| s == ';') {
             Some(_) => {
                 let split = encoding.split(';').collect::<Vec<&'a str>>();
@@ -67,7 +86,7 @@ fn parse_accept_encoding<'a>(accept_encodings: &'a Vec<&'a str>) -> Result<Encod
             },
             None => { parse_encoding(*encoding).map(|c| priorities.insert(c, 1.0)); }
         }
-    });
+    }
     Ok(priorities)
 }
 

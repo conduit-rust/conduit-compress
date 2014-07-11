@@ -42,7 +42,7 @@ fn parse_accept_encoding<'a>(accept_encodings: &'a Vec<&'a str>) -> Result<Encod
                 if split.len() != 2 {
                     error!("Bad formatting in Accept-Encoding header: {}", encoding);
                 } else {
-                    from_str(*split.get(0)).map(|c| from_str::<f64>(*split.get(1)).map(|p| {
+                    from_str(*split.get(0)).map(|c| from_str::<f64>(split.get(1).slice_from(2)).map(|p| {
                         priorities.insert(c, p)
                     }));
                 }
@@ -51,5 +51,40 @@ fn parse_accept_encoding<'a>(accept_encodings: &'a Vec<&'a str>) -> Result<Encod
         }
     }
     Ok(priorities)
+}
+
+#[cfg(test)]
+mod test {
+    use super::{parse_accept_encoding, best_encoder, get_compressor, EncodingPriorities};
+    use super::super::compressors::{Compressor, Gzip, Deflate};
+
+    fn to_priorities(priorities: Vec<(Compressor, f64)>) -> EncodingPriorities {
+        priorities.move_iter().collect()
+    }
+
+    #[test]
+    fn parse_no_q() {
+        let test_accept_encoding = vec!["gzip", "deflate"];
+        assert_eq!(parse_accept_encoding(&test_accept_encoding).ok().unwrap(),
+                   to_priorities(vec![(Gzip, 1.0), (Deflate, 1.0)]));
+    }
+
+    #[test]
+    fn parse_with_q() {
+        let test_accept_encoding = vec!["gzip;q=0.8", "deflate"];
+        assert_eq!(parse_accept_encoding(&test_accept_encoding).ok().unwrap(),
+                   to_priorities(vec![(Gzip, 0.8), (Deflate, 1.0)]));
+    }
+
+    #[test]
+    fn best_encoder_detection() {
+        assert_eq!(best_encoder(to_priorities(vec![(Gzip, 0.8), (Deflate, 1.0)])).ok().unwrap(), Deflate);
+    }
+
+    #[test]
+    fn end_to_end() {
+        let test_accept_encoding = vec!["gzip;q=0.8", "deflate"];
+        assert_eq!(get_compressor(&test_accept_encoding).ok().unwrap(), Deflate);
+    }
 }
 

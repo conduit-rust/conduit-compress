@@ -17,14 +17,13 @@ mod compressors;
 pub struct Compress;
 
 impl middleware::Middleware for Compress {
-    fn after(&self, req: &mut Request, res: Result<Response, Box<Show>>)
-        -> Result<Response, Box<Show>> {
+    fn after(&self, req: &mut Request, res: Result<Response, Box<Show>>) -> Result<Response, Box<Show>> {
         match req.headers().find("Accept-Encoding") {
             Some(ref accept_encoding) => {
                 let mut r = try!(res);
                 let compressor = try!(get_compressor(accept_encoding));
                 compressor.compress(&mut r);
-                Err(box "String".to_string() as Box<Show>)
+                Ok(r)
             },
             // no compression enabled for this request
             None => res

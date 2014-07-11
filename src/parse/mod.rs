@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 use std::fmt::Show;
-use super::compressors::{Compressor, Gzip, Deflate};
+use super::compressors::Compressor;
 
 #[deriving(Show, Clone)]
-enum CompresErrorKind {
+enum CompressErrorKind {
     NoCompressor
 }
 
 #[deriving(Show, Clone)]
 struct CompressError<S> {
-    kind: CompresErrorKind,
+    kind: CompressErrorKind,
     desc: S
 }
 
@@ -42,22 +42,14 @@ fn parse_accept_encoding<'a>(accept_encodings: &'a Vec<&'a str>) -> Result<Encod
                 if split.len() != 2 {
                     error!("Bad formatting in Accept-Encoding header: {}", encoding);
                 } else {
-                    parse_encoding(*split.get(0)).map(|c| from_str::<f64>(*split.get(1)).map(|p| {
+                    from_str(*split.get(0)).map(|c| from_str::<f64>(*split.get(1)).map(|p| {
                         priorities.insert(c, p)
                     }));
                 }
             },
-            None => { parse_encoding(*encoding).map(|c| priorities.insert(c, 1.0)); }
+            None => { from_str(*encoding).map(|c| priorities.insert(c, 1.0)); }
         }
     }
     Ok(priorities)
-}
-
-fn parse_encoding(compressor: &str) -> Option<Compressor> {
-    match compressor {
-        "gzip" => Some(Gzip),
-        "deflate" => Some(Deflate),
-        _ => None
-    }
 }
 

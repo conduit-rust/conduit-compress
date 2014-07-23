@@ -1,7 +1,10 @@
 use conduit::Response;
+use flate2::{GzEncoder, DeflateEncoder, Default};
 
 use std::from_str::FromStr;
-use std::io::MemReader;
+use std::fmt::Show;
+use std::io::{MemReader, MemWriter};
+use std::io::util::copy;
 
 #[deriving(PartialEq, Eq, Show, Clone, Hash)]
 pub enum Compressor {
@@ -20,8 +23,32 @@ impl FromStr for Compressor {
 }
 
 impl Compressor {
-    pub fn compress(&self, res: &mut Response) {
-        res.body = box MemReader::new(res.body.read_to_end().unwrap()) as Box<Reader + Send>;
+    pub fn compress(&self, res: &mut Response) -> Result<(), Box<Show>> {
+        let mut compressed;
+        match *self {
+            Gzip => {
+                let mut compressor = GzEncoder::new(MemWriter::new(), Default);
+                let body: &mut Reader = res.body;
+                try!(copy_from_body(body, &mut compressor));
+                compressed = compressor.finish().ok().unwrap().unwrap();
+            },
+            Deflate => {
+                let mut compressor = DeflateEncoder::new(MemWriter::new(), Default);
+                let body: &mut Reader = res.body;
+                try!(copy_from_body(body, &mut compressor));
+                compressed = compressor.finish().ok().unwrap().unwrap();
+            }
+        }
+        res.body = box MemReader::new(compressed) as Box<Reader + Send>;
+        Ok(())
+    }
+}
+
+fn copy_from_body<W: Writer>(mut body: &mut Reader,
+                             compressor: &mut W) -> Result<(), Box<Show>> {
+    match copy(&mut body, compressor) {
+        Err(e) => Err(box e as Box<Show>),
+        _ => Ok(())
     }
 }
 

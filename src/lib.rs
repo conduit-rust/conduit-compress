@@ -3,6 +3,7 @@
 
 extern crate conduit;
 extern crate middleware = "conduit-middleware";
+extern crate flate2;
 #[phase(plugin, link)] extern crate log;
 
 use std::fmt::Show;
@@ -22,8 +23,10 @@ impl middleware::Middleware for Compress {
             Some(ref accept_encoding) => {
                 let mut r = try!(res);
                 let compressor = try!(get_compressor(accept_encoding));
-                compressor.compress(&mut r);
-                Ok(r)
+                match compressor.compress(&mut r) {
+                    Ok(_) => Ok(r),
+                    Err(e) => Err(e)
+                }
             },
             // no compression enabled for this request
             None => res

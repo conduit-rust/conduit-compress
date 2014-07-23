@@ -42,7 +42,7 @@ fn parse_accept_encoding<'a>(accept_encodings: &'a Vec<&'a str>) -> Result<Encod
                 if split.len() != 2 {
                     error!("Bad formatting in Accept-Encoding header: {}", encoding);
                 } else {
-                    from_str(*split.get(0)).map(|c| from_str::<f64>(split.get(1).slice_from(2)).map(|p| {
+                    from_str(split[0]).map(|c| from_str::<f64>(split[1].slice_from(2)).map(|p| {
                         priorities.insert(c, p)
                     }));
                 }

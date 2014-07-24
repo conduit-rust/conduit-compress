@@ -25,20 +25,23 @@ impl FromStr for Compressor {
 impl Compressor {
     pub fn compress(&self, res: &mut Response) -> Result<(), Box<Show>> {
         let mut compressed;
-        match *self {
-            Gzip => {
-                let mut compressor = GzEncoder::new(MemWriter::new(), Default);
-                let body: &mut Reader = res.body;
-                try!(copy_from_body(body, &mut compressor));
-                compressed = compressor.finish().ok().unwrap().unwrap();
-            },
-            Deflate => {
-                let mut compressor = DeflateEncoder::new(MemWriter::new(), Default);
-                let body: &mut Reader = res.body;
-                try!(copy_from_body(body, &mut compressor));
-                compressed = compressor.finish().ok().unwrap().unwrap();
+
+        {
+            let body: &mut Reader = res.body;
+            match *self {
+                Gzip => {
+                    let mut compressor = GzEncoder::new(MemWriter::new(), Default);
+                    try!(copy_from_body(body, &mut compressor));
+                    compressed = compressor.finish().ok().unwrap().unwrap();
+                },
+                Deflate => {
+                    let mut compressor = DeflateEncoder::new(MemWriter::new(), Default);
+                    try!(copy_from_body(body, &mut compressor));
+                    compressed = compressor.finish().ok().unwrap().unwrap();
+                }
             }
         }
+
         res.body = box MemReader::new(compressed) as Box<Reader + Send>;
         Ok(())
     }
@@ -46,9 +49,6 @@ impl Compressor {
 
 fn copy_from_body<W: Writer>(mut body: &mut Reader,
                              compressor: &mut W) -> Result<(), Box<Show>> {
-    match copy(&mut body, compressor) {
-        Err(e) => Err(box e as Box<Show>),
-        _ => Ok(())
-    }
+    copy(&mut body, compressor).map_err(|e| box e as Box<Show>)
 }
 
